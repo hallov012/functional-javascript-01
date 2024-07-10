@@ -8,25 +8,32 @@
 ### L.map
 
 <script>
-  // L.map = function *(f, iter) {
-  //   for (const a of iter) yield f(a);
-  // };
-  // var it = L.map(a => a + 10, [1, 2, 3]);
-  // log(it.next());
-  // log(it.next());
-  // log(it.next());
+  L.map = function *(f, iter) {
+    for (const a of iter) yield f(a);
+  };
+  var it = L.map(a => a + 10, [1, 2, 3]);
+  /**
+   * iterator를 전개할 수 있기 때문에, 전개 연산자를 사용할 수 있음
+   * 준비가 되어있는 이터레이터 객체를 내가 원하는 방식으로 평가하며 사용 가능
+   */
+  log([...it]); // [11, 12, 13]
+  log(it.next()); // {value: 11, done: false}
+  log(it.next()); // {value: 12, done: false}
+  log(it.next()); // {value: 13, done: false}
+  console.clear()
 </script>
 
 ### L.filter
 
 <script>
-  // L.filter = function *(f, iter) {
-  //   for (const a of iter) if (f(a)) yield a;
-  // };
-  // var it = L.filter(a => a % 2, [1, 2, 3, 4]);
-  // log(it.next());
-  // log(it.next());
-  // log(it.next());
+  L.filter = function *(f, iter) {
+    for (const a of iter) if (f(a)) yield a;
+  };
+  var it = L.filter(a => a % 2, [1, 2, 3, 4]);
+  log(it.next()); // {value: 1, done: false}
+  log(it.next()); // {value: 3, done: false}
+  log(it.next()); // {value: undefined, done: true}
+  console.clear()
 </script>
 
 
@@ -45,7 +52,7 @@
   const map = curry((f, iter) => {
     let res = [];
     iter = iter[Symbol.iterator]();
-    let cur;
+    let cur; // 루프를 돌면서 저장 할 임시 변수
     while (!(cur = iter.next()).done) {
       const a = cur.value;
       res.push(f(a));
@@ -106,6 +113,7 @@
   L.range = function* (l) {
     let i = -1;
     while (++i < l) {
+      // log(i)  infinite를 모두 돌지 않고, 필요한 값을 다 채우면 종료된다.
       yield i;
     }
   };
@@ -130,23 +138,37 @@
     }
   });
 
+  // 즉시 평가의 경우 => 함수의 순서대로 모든 평가가 한번에 진행 됨
   // [0, 1, 2, 3, 4, 5, 6, 7, 8...]
   // [10, 11, 12, ...]
   // [11, 13, 15 ..]
   // [11, 13]
   //
+  // 지연 평가의 경우 => 하나씩 아래로 평가가 진행 됨
   // [0    [1
   // 10     11
   // false]  true]
-  //
 
-  // console.time('L');
-  // go(L.range(Infinity),
-  //   L.map(n => n + 10),
-  //   L.filter(n => n % 2),
-  //   take(10),
-  //   log);
-  // console.timeEnd('L');
+  /**
+   * 위에서 다른 경우와는 다르게 take가 먼저 실행되게 됨 (iter 자리에는 Generator {<suspended>}가 들어가게 됨)
+   * 이터레이터는 본인이 이터레이터이면서, 본인이 심볼이터레이터를 가지고,
+   * 해당 심볼이터레이터를 실행하면 또 다시 이터레이터(자기 자신)를 반환
+   * 따라서 이터레이터 객체를 iter로 함수에서 받아도 실행 가능 함
+   *
+   * L.range를 한 결과가 안쪽에 코드들이 평가되기를 미뤄둔 제너레이터가 되어 바로 L.map으로
+   * 들어가고 동일한 과정을 거쳐 take가 먼저 실행되게 됨
+   * take 함수에서 작동된 iter.next()가 실행되며 평가가 진행되게 됨
+   *
+   * filter의 iter.next()가 동작하면 L.map으로 이동하게 되며, L.map의 iter.next()가 실행되어 L.range로 진입
+   * L.range에서 yeild i가 실행되어 L.map으로 이동하게 되며, L.map의 iter.next()가 실행되어 L.filter로 진입
+   */
+  console.time('L');
+  go(L.range(Infinity),
+    L.map(n => n + 10),
+    L.filter(n => n % 2),
+    take(10),
+    log);
+  console.timeEnd('L');
 </script>
 
 ### map, filter 계열 함수들이 가지는 결합 법칙
