@@ -2,11 +2,32 @@
 <script>
   // ## L.map + take로 map 만들기
 
+  /**
+   * 기존 map
+   *   const map = curry((f, iter) => {
+   *     let res = [];
+   *     iter = iter[Symbol.iterator]();
+   *     let cur; // 루프를 돌면서 저장 할 임시 변수
+   *     while (!(cur = iter.next()).done) {
+   *       const a = cur.value;
+   *       res.push(f(a));
+   *     }
+   *     return res;
+   *   });
+   * */
+
   L.map = curry(function* (f, iter) {
     for (const a of iter) {
       yield f(a);
     }
   });
+
+  // const map = curry((f, iter) => go(
+  //   L.map(f, iter),
+  //   take(Infinity) // 해당되는 지연값을 모두 return 해주기 위해 take 사용
+  // ))
+  // curry의 인수로 받은 값이 그대로 L.map의 인수가 되기 때문에 pipe 수정해도 괜찮다
+  // const map = curry(pipe(L.map, take(Infinity)));
 
   const takeAll = take(Infinity);
 

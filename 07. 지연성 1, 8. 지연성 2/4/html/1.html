@@ -7,24 +7,29 @@
 
   const isIterable = a => a && a[Symbol.iterator];
 
+  // 배열과 값들이 혼재되어 있을 때, 하나의 배열을 생성하는 함수
   L.flatten = function* (iter) {
     for (const a of iter) {
+        // 만약 a가 이터러블이라면, a의 값을 하나씩 yield
       if (isIterable(a)) for (const b of a) yield b
       else yield a;
     }
   };
 
   var it = L.flatten([[1, 2], 3, 4, [5, 6], [7, 8, 9]]);
-  log(it.next());
-  log(it.next());
-  log(it.next());
-  log(it.next());
-  log(take(6, L.flatten([[1, 2], 3, 4, [5, 6], [7, 8, 9]])));
+  log([...it]) // [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  log(it.next()); // {value: 1, done: false}
+  log(it.next()); // {value: 2, done: false}
+  log(it.next()); // {value: 3, done: false}
+  log(it.next()); // {value: 4, done: false}
+  log(take(6, L.flatten([[1, 2], 3, 4, [5, 6], [7, 8, 9]]))); // [1, 2, 3, 4, 5, 6]
 
   // log(it.next());
   // log(it.next());
   // log(it.next());
   // log(it.next());
+
+  // 즉시 평가하는 flatten
   const flatten = pipe(L.flatten, takeAll);
   log(flatten([[1, 2], 3, 4, [5, 6], [7, 8, 9]]));
 
@@ -66,18 +71,21 @@
   };
   log([...L.deepFlat([1, [2, [3, 4], [[5]]]])]);
   // [1, 2, 3, 4, 5];
+  console.clear();
 </script>
 
 ## L.flatMap
-
+## map과 flatten을 동시에 하는 함수
 <script>
-  // log([[1, 2], [3, 4], [5, 6, 7]].flatMap(a => a));
-  // log([[1, 2], [3, 4], [5, 6, 7]].flatMap(a => a.map(a => a * a)));
+  // JS 기본 flatMap
+  // log([[1, 2], [3, 4], [5, 6, 7]].flatMap(a => a)); // [1, 2, 3, 4, 5, 6, 7] => 여기서 a는 배열
+  // log([[1, 2], [3, 4], [5, 6, 7]].flatMap(a => a.map(a => a * a))) ; // 배열에 다시 map을 적용
   // log(flatten([[1, 2], [3, 4], [5, 6, 7]].map(a => a.map(a => a * a))));
   // log(flatten([[1, 2], [3, 4], [5, 6, 7]].map(a => a.map(a => a * a))));
+  // 이 둘의 시간 복잡도 차이는 거의 없음
 
+  // 시간복잡도 차이는 크게 없으나 효율적
   L.flatMap = curry(pipe(L.map, L.flatten));
-  const flatMap = curry(pipe(L.map, flatten));
 
   // var it = L.flatMap(map(a => a * a), [[1, 2], [3, 4], [5, 6, 7]]);
   var it = L.flatMap(a => a, [[1, 2], [3, 4], [5, 6, 7]]);
@@ -89,17 +97,21 @@
   // log(it.next());
   // log(it.next());
   // log(it.next());
+
+  const flatMap = curry(pipe(L.map, flatten));
+
   log(flatMap(a => a, [[1, 2], [3, 4], [5, 6, 7]]));
 
-  log(flatMap(L.range, map(a => a + 1, [1, 2, 3])));
+  log(flatMap(L.range, map(a => a + 1, [1, 2, 3]))); // [0, 1, 0, 1, 2, 0, 1, 2, 3]
 
-  var it = L.flatMap(L.range, map(a => a + 1, [1, 2, 3]));
+  // var it = L.flatMap(L.range, [1, 2, 3]) // [0, 0, 1, 0, 1, 2]
+  var it = L.flatMap(L.range, map(a => a + 1, [1, 2, 3])); // [0, 1, 0, 1, 2, 0, 1, 2, 3]
   log(it.next());
   log(it.next());
   log(it.next());
   log(it.next());
 
-  log(take(3, L.flatMap(L.range, map(a => a + 1, [1, 2, 3]))));
+  log(take(3, L.flatMap(L.range, map(a => a + 1, [1, 2, 3])))); // [0, 1, 0]
   console.clear();
 </script>
 
@@ -115,12 +127,20 @@
   ];
 
   go(arr,
-    L.flatten,
-    L.filter(a => a % 2),
-    L.map(a => a * a),
-    take(4),
-    reduce(add),
+    flatten,
+    filter(a => a % 2),
+    log
+  ) // [1, 3, 5, 7, 9]
+
+  go(arr,
+    L.flatten, // Generator {<suspended>}
+    L.filter(a => a % 2), // Generator {<suspended>}
+    L.map(a => a * a), // Generator {<suspended>}
+    take(4), // [1, 9, 25, 49]
+    reduce(add), // 84
     log);
+
+  console.clear()
 </script>
 
 
@@ -152,6 +172,15 @@
       ]
     }
   ];
+
+  go(users,
+  flatMap(u => u.family), // family를 펼침
+  filter(u => u.age > 20), // 20세 이상인 가족들만 필터링
+  map(u => u.age), // 나이만 추출
+  take(4), // 4개만 추출
+  reduce(add), // 나이의 합
+  log
+  );
 
   go(users,
     L.flatMap(u => u.family),
