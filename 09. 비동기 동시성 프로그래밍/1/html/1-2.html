@@ -5,9 +5,10 @@
 <script>
   go(Promise.resolve(1),
     a => a + 10,
+    // go에서 then을 사용해 처리하고 있으므로 reject되면 밑의 함수들은 실행되지 않음
     a => Promise.reject('error~~'),
     a => console.log('----'),
     a => a + 1000,
     a => a + 10000,
-    log).catch(a => console.log(a));
+    log).catch(a => console.log(a)); // error~~
 </script>
