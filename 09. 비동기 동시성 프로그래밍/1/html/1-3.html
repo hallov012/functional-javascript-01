@@ -1,6 +1,8 @@
 <script src="../lib/fx.js"></script>
 
 ## promise.then의 중요한 규칙
+Promise가 resolve되면 then을 통해 전달한 함수가 실행되고, 그 함수의 return 값이 다음 then의 인자로 전달된다.
+.then을 통해 원하는 시점의 Promise 값을 한번에 반환 할 수 있다.
 
 <script>
   Promise.resolve(Promise.resolve(1)).then(function (a) {

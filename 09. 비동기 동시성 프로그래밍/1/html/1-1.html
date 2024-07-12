@@ -5,30 +5,49 @@
 ## 일급
 
 <script>
+  /**
+   * Callback
+   * 함수에서 사용할 인자 + 그 인자로 실행할 함수 전달
+   * 결과만 return 해주고 끝남
+   * */
   function add10(a, callback) {
     setTimeout(() => callback(a + 10), 100);
   }
 
-  var a = add10(5, res => {
-    add10(res, res => {
-      add10(res, res => {
-        // log(res);
-      });
-    });
-  });
+  add10(5, res => {
+      log(res)
+  })
 
-  // log(a);
-
+  /**
+   * Promise
+   * 해당 함수에서 사용할 인자만 전달
+   * Promise 객체를 반환(return)
+   * 비동기 상황을 1급 값을 사용해 다룸 => "대기 중인" 어떠한 값을 다루는 것
+   * (다른 함수에 전달 가능, 변수에 할당 가능 등 여러 방법으로 다룰 수 있음)
+   * 결과가 있고, 결과가 떨어지만 그 이후에 할 일을 정의할 수 있음(then)
+   * */
   function add20(a) {
-    return new Promise(resolve => setTimeout(() => resolve(a + 20), 100));
+      return new Promise(resolve => setTimeout(() => resolve(a + 20), 100));
   }
 
-  var b = add20(5)
-    .then(add20)
-    .then(add20)
-  // .then(log);
+  // 연속해서 처리하기 위해, 콜백 안에 콜백을 넣어야 함
+  var a = add10(5, res => {
+      add10(res, res => {
+          add10(res, res => {
+              log(res)
+          })
+      })
+  })
 
-  // log(b);
+  // 연속적인 처리를 할때, then을 사용하여 처리 => 순차적으로 처리가 완료됨
+  // 콜백을 연속적으로 사용할 때 보다 가독성이 좋음
+  var b = add20(5)
+      .then(add20)
+      .then(add20)
+      .then(log);
+
+  log('a: ', a); // undefined
+  log('b: ', b); // Promise {<pending>} 프로미스가 return 되기 때문에 그 이후 원하는 행동을 할 수 있다
 </script>
 
 ## 일급 활용
@@ -37,43 +56,86 @@
   const delay100 = a => new Promise(resolve =>
     setTimeout(() => resolve(a), 100));
 
-  const go1 = (a, f) => a instanceof Promise ? a.then(f) : f(a);
   const add5 = a => a + 5;
 
+  /**
+   *   // 제대로 동작하려면 f는 동기적으로 동작해야하며, a도 바로 알 수 있는 값이어야 함 => Promise 객체가 아니어야 정상 작동
+   *   // 이후 강의에서 추가된 lib > go1 때문에 실행이 안되는 오류가 있어 go_1로 변경
+   *   const go_1 = (a, f) => f(a)
+   *   log(go_1(5, add5)) // 10
+   *   // Promise.resolve(5): 해결된 상타의 Promise 객체를 반환하고 그 값으로 5를 전달
+   *   log('add', go_1(Promise.resolve(5), add5)) // [object Promise]5
+   * */
+
+  // a가 Promise 객체인 경우, then을 사용하여 값을 꺼내서 f에 전달
+  const go_1 = (a, f) => a instanceof Promise ? a.then(f) : f(a);
+  go_1(Promise.resolve(5), add5).then(log) // 10
+  go_1(delay100(5), add5).then(log) // 10
+
+
+  /**
+   * go_1 가 Promise 객체를 받아서 처리하도록 구현되어 있기 때문에
+   * n1, n2가 뭐든 상관 없이 코드가 같아짐
+   */
   const n1 = 10;
-  // log(go1(go1(n1, add5), log));
+  go_1(go_1(n1, add5), log) // 15
+  log(go_1(go_1(n1, add5), log)) // undefined
 
   const n2 = delay100(10);
-  // log(go1(go1(n2, add5), log));
+  go_1(go_1(n2, add5), log) // 15
+  log(go_1(go_1(n2, add5), log)) // Promise {<pending>}
 </script>
 
 ## Composition
+Promise => 비동기 값을 가지고 연속적인 함수 실행을 안전하게 하기 위해 사용
 
 <script type="module">
-  // f . g
-  // f(g(x))
-
+  /**
+   * 함수 합성
+   * f . g
+   * f(g(x))
+   * 함수 g의 결과를 함수 f에 전달
+   */
   const g = a => a + 1;
   const f = a => a * a;
 
-  // log(f(g(1)));
-  // log(f(g()));
+  // log(f(g(1))); // 4
+  // log(f(g())); // NaN
+  // 이와 같이 안전한 인자가 들어올 것이라는 보장이 없는 상황에서 어떻게 해야하는지
 
-  Array.of(1).map(g).map(f)/*.forEach(r => log(r))*/;
-  [].map(g).map(f)/*.forEach(r => log(r))*/;
+  /**
+   * monad는 박스를 가지고 있고, 박스 안에 실제 효과/연산에 필요한 정보를 가지고 있음
+   * 연산 후, 박스(Array) 자체를 보여줄 필요는 없기 때문에 foreach로 출력
+   */
+  Array.of(1).map(g).map(f);/*.forEach(r => log(r))*/  // [4];
+  // 출력 값 없음 => 박스 안에 효과가 있는지 없는지에 따라서 함수 합성을 안전히 하고 있음
+  // monad의 형태로 Array와 map을 사용해 처리하기 때문
+  [].map(g).map(f)/*.forEach(r => log(r))*/
 
-  Promise.resolve(2).then(g).then(f)/*.then(r => log(r))*/;
+  /**
+   * Promise는 입력된 값이 잘 들어왔는지는 확인 할 수 없음
+   * 값의 정확성/ 존재 여부에 관련해서는 안전한 합성을 보장하지 않음
+   * 단지, 비동기 상황에서 안전하게 함수 합성을 하기 위해 사용
+   */
+  Promise.resolve(2).then(g).then(f)/*.then(r => log(r))*/; // 9
+  Promise.resolve().then(g).then(f)/*.then(r => log(r))*/; // NaN
+
+  // 비동기적으로 실행되는 효과를 가진 박스: monad
+  // 이를 안전하게 처리할 수 있도록 하는 것: Promise
   new Promise(resolve =>
     setTimeout(() => resolve(2), 100)
-  ).then(g).then(f)/*.then(r => log(r))*/;
+  ).then(g).then(f)/*.then(r => log(r))*/; // 9
 </script>
 
 ## Kleisli Composition
+오류가 있을 수도 있는 상황에서 합성을 안전하게 하기 위한 규칙
+- 인자가 정확히 들어오지 않았거나, 들어왔으나 외부의 상태에 의해 결과를 정확히 전달 할 수 없을 때
+에러가 나는 것을 해결하기 위한 합성함수
 
 <script>
   // f . g
   // f(g(x)) = f(g(x))
-  // f(g(x)) = g(x)
+  // f(g(x)) = g(x) => g에서 에러가 난 경우 f * g와 g 의 결과를 같게 만듦
 
   var users = [
     {id: 1, name: 'aa'},
@@ -81,17 +143,19 @@
     {id: 3, name: 'cc'}
   ];
 
+
   const getUserById = id =>
-    find(u => u.id == id, users) || Promise.reject('없어요!');
+    find(u => u.id == id, users) || Promise.reject('None!');
 
   const f = ({name}) => name;
   const g = getUserById;
 
   // const fg = id => f(g(id));
+  // log(fg(2)) // bb
+  // log(fg(2) === fg(2)) // true가 일반적이지만 실제로는 외부요인으로 false가 될 수 있다(users의 상태가 변결될 수 있음)
 
   const fg = id => Promise.resolve(id).then(g).then(f).catch(a => a);
-
-  fg(2).then(log);
+  fg(2).then(log); // bb
 
   setTimeout(function () {
     users.pop();

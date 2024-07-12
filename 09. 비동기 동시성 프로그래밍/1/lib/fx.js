@@ -14,11 +14,26 @@ const reduce = curry((f, acc, iter) => {
   } else {
     iter = iter[Symbol.iterator]();
   }
-  return go1(acc, function recur(acc) {
+  /**
+   *    let cur;
+   *   while (!(cur = iter.next()).done) {
+   *     const a = cur.value;
+   *         // 중간에 Promise를 한번 만나게 되면 그 이후의 모든 연산은 Promise로 처리하게 됨 => 연속적으로 비동기 발생
+   *         // 개발자의 의도와 달라 질 수 있고, 중복되면 불필요한 로드로 인한 성능저하 유발 가능
+   *         // 따라서 중간에 Promise를 만나도 이후에 Promise를 만나지 않는다면 다시 동기로 돌아와야 함
+   *         acc = acc instanceof Promise ? acc.then(acc => f(acc, a)) : f(acc, a);
+   *   }
+   *   return acc;
+   * */
+
+  // 첫번째 인자가 Promise여도 문제 없도록 go1 함수를 사용
+  return go1(acc, function recur (acc) {
     let cur;
     while (!(cur = iter.next()).done) {
       const a = cur.value;
       acc = f(acc, a);
+      // Promise를 만나면 acc.then(recur)로 다시 돌아가는데, then 이후이기 때문에 Promise에서 다시 동기로 돌아온 상태가 된다
+      // 따라서 이번에는 바로 return acc 이 됨(동기)
       if (acc instanceof Promise) return acc.then(recur);
     }
     return acc;
