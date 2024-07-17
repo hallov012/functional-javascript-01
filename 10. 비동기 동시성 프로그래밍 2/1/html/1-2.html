@@ -1,15 +1,47 @@
 <script src="../lib/fx.js"></script>
 
 ## 지연된 함수열을 병렬적으로 평가하기 - C.reduce, C.take
+JS가 동작하는 환경(브라우저, Node.js)에서는 비동기 IO로 보통 동작한다
 
 <script>
-  const C = {};
+    const delay1000 = a => new Promise(resolve => {
+      console.log('hi~');
+      setTimeout(() => resolve(a), 1000);
+    });
 
+  /**
+   * 지연평가를 이용하면, 세로로 코드가 평가됨
+   * 현재 아래의 코드의 경우 하나의 세로 평가가 완료 된 후, 다음 평가가 진행 됨
+   */
+  // console.time('')
+  // go([1, 2, 3, 4, 5],
+  //   L.map(a => delay1000(a * a)),
+  //   L.filter(a => a % 2),
+  //   reduce(add),
+  //   log,
+  //   _ => console.timeEnd('')
+  // ) // delay1000이 5번 실행되어 약 5초 소요
+
+  const C = {};
   function noop() {
   }
 
   const catchNoop = ([...arr]) =>
+    /**
+     * 캐치가 된 프로미스들을 전달하면 이후에 다시 캐치를 할 수 없으므로 캐치를 걸어두기만 한다.
+     * [...arr].map(a => a.catch(noop)); // 이렇게 하면 캐치가 되어버림
+     */
+    // 모든 Promise에 catch로 들어가게 되면 아무 행동도 하지 않도록 설정
     (arr.forEach(a => a instanceof Promise ? a.catch(noop) : a), arr);
+
+  // 왼쪽에서 오른쪽으로 결합
+  // C.reduce = curry((f, acc, iter) => iter ?
+  //     /**
+  //      * promise.reject()을 사용해 왔었는데 이러면 log가 남게 됨
+  //      * 따라서 project.reject이 되기 전에, 미리 catch 할 수 있도록 변경
+  //      */
+  //     reduce(f, acc, [...iter]) :
+  //     reduce(f, [...acc]));
 
   C.reduce = curry((f, acc, iter) => iter ?
     reduce(f, acc, catchNoop(iter)) :
@@ -23,10 +55,16 @@
 
   C.filter = curry(pipe(L.filter, C.takeAll));
 
-  const delay1000 = a => new Promise(resolve => {
-    console.log('hi~');
-    setTimeout(() => resolve(a), 1000);
-  });
+  // console.time('')
+  // go([1, 2, 3, 4, 5],
+  //     L.map(a => delay1000(a * a)),
+  //     L.filter(a => a % 2),
+  //     C.take(2),
+  //     reduce(add),
+  //     log,
+  //     _ => console.timeEnd('')
+  // ) // 코드 실행과 동시에 delay1000으로 한번에 진입 => 약 1초정도 소요
+
   /*  // console.time('');
     go([1, 2, 3, 4, 5, 6, 7, 8, 9],
       L.map(a => delay1000(a * a)),
