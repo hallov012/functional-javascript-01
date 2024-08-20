@@ -3,6 +3,26 @@
 ## async/await
 
 <script>
+  // function delay(a) {
+  //   // Promise를 return하여 await를 통해 결과를 기다림
+  //   return new Promise(resolve => setTimeout(() => resolve(a), 500));
+  // }
+  //
+  // async function f1() {
+  //   const a = await delay(10);
+  //   const b = await delay(5);
+  //   log(a + b);
+  // }
+  //
+  // f1() // 15
+
+  /**
+   * delay에서도 Promise를 보이지 않게 하기 위해
+   * delayIdentity라는 함수로 만들고 async/await를 사용
+   *
+   * 이미 만들어져 있는 라이브러리(Prmoise를 반환하는 함수)를 사용할 때는 async/await로 대응 가능하나
+   * 직접 Promise를 다루거나 평가시점을 조절할 때를 위해 Promise를 조작하는 법을 알아두는 것이 좋다
+   */
   function delay(time) {
     return new Promise(resolve => setTimeout(() => resolve(), time));
   }
@@ -18,6 +38,14 @@
     return a + b;
   }
 
+  // log(f1()) // Promise { <pending> }
+  // f1().then(log); // 15
+  // go(f1(), log); // 15
+  // (async () => {
+  //   log(f1()) // Promise { <pending> }
+  //   log(await f1()); // 15
+  // }) ()
+
   // const pa = Promise.resolve(10);
   const pa = f1();
 
@@ -26,44 +54,64 @@
     // log(await pa);
     // log(await pa);
   })();
-  // f1();
-  // f1().then(log);
-  // go(f1(), log);
-  // (async () => {
-  //   log(await f1());
-  // }) ();
 </script>
 
 ## QnA. Array.prototype.map이 있는데 왜 FxJS의 map 함수가 필요한지?
+- 기존의 map 함수는 내부적으로 보조함수에서 Promise를 반환해도 이를 제어해주지 않기 때문에 비동기 상황에서 사용하기 어렵다.
 
 <script>
   function delayI(a) {
     return new Promise(resolve => setTimeout(() => resolve(a), 100));
   }
 
+  // Array.prototype.map
   async function f2() {
     const list = [1, 2, 3, 4];
+    // const res = list.map(a => delayI(a * a));
+    // log(res); // [Promise, Promise, Promise, Promise]
+
     const temp = list.map(async a => await delayI(a * a));
-    // log(temp);
-    const res = await temp;
-    // log(res);
+    // log(temp); // [Promise, Promise, Promise, Promise]
+    // Promise 객체들은 Array안의 값이기 때문에 밖에 await를 붙이더라고 풀어낼 수 없음
+    const tempRes = await temp;
+    // log(tempRes); // [Promise, Promise, Promise, Promise]
   }
 
   f2();
 
+  // FxJS의 map
   async function f3() {
     const list = [1, 2, 3, 4];
-    const temp = map(a => delayI(a * a), list);
-    // log(temp);
-    const res = await temp;
-    // log(res);
+    // 안쪽에 있는 값들을 변경하고 최종적으로 resolve됐을 때 Array로 반환
+    // const temp = map(a => delayI(a * a), list);
+    // log(temp); // Promise { <pending> }
+    // const res = await temp;
+    // log(res); // [1, 4, 9, 16]
+
+    const res = await map(a => delayI(a * a), list);
+    // log(res) // [1, 4, 9, 16]
   }
 
   f3();
 
-  function f4() {
-    return map(a => delayI(a * a), [1, 2, 3, 4]);
+  // Map으로 return된 결과를 출력할 때의 이슈
+  async function f4() {
+    const list = [1, 2, 3, 4];
+    /**
+     * const res = await map(a => delayI(a * a), list);
+     * log ('f4', res) // [1, 4, 9, 16]
+     * // Prmoise 값이 아니라 결과 값이 출력되나 return 해서 log(f4())를 찍으면 Promise { <pending> }이 출력됨
+     * return res
+     *
+     * 그런게 사실 Prmoise를 풀고 return하나 바로 return하나 결과는 같음
+     * => 결국 Promise 값을 return하는 것이기 때문에 Promise { <pending> }이 출력됨
+     * 따라서 출력하려 할 때 await를 붙여서 결과를 출력해야 함
+     */
+    return map(a => delayI(a * a), list);
   }
+
+  // log('f4', f4()); // Promise { <pending> }
+  // f4().then(log) // [1, 4, 9, 16]
 
   (async () => {
     // log(await f4());
@@ -71,6 +119,10 @@
 </script>
 
 ## QnA. 이제 비동기는 async/await로 제어할 수 있는데 왜 파이프라인이 필요한지?
+- 파이프라인이 해결하고자하는 문제와 async/await가 해결하고자 하는 문제가 다르기 때문에 둘을 같이 사용하는 것이 좋다.
+- Async/awiat: Promise.then.then.. 같은 함수 체인이 아닌 문장형으로 다루기 위함(가독성 향상)
+- 파이프라인: iterable 중심으로 사고하며 명령형 프로그래밍을 하지 않고 더 안전하게 함수 합성을 하기 위함
+- 파이프라인은 함수 합성을 위해, Async/awiat는 반대로 분해하기 위해 사용
 
 <script>
   function f5(list) {
@@ -82,8 +134,9 @@
       reduce((a, b) => delayI(a + b)));
   }
 
-  go(f5([1, 2, 3, 4, 5, 6, 7, 8]), a => log(a, 'f5'));
+  // go(f5([1, 2, 3, 4, 5, 6, 7, 8]), a => log(a, 'f5')); // 12
 
+  // f5를 명령형으로 풀어쓴 코드 => 복잡하고 가독성이 떨어짐 => 이를 해결하기 위해 파이프라인을 사용
   async function f6(list) {
     let temp = [];
     for (const a of list) {
@@ -101,10 +154,10 @@
     return res;
   }
 
-  go(f6([1, 2, 3, 4, 5, 6, 7, 8]), log);
+  // go(f6([1, 2, 3, 4, 5, 6, 7, 8]), a => log(a, 'f6')); // 12
 </script>
 
-## QnA. async/await와 파이프라인을 같이 사용하기도 하나요?
+## QnA. async/await와 파이프라인을 같이 사용하기도 하나요? Yes
 
 <script>
   async function f52(list) {
@@ -171,6 +224,7 @@
 <script>
   async function f9(list) {
     try {
+      // 합성함수가 잘 연결되어 있기 때문에 한번에 에러 핸들링을 할 수 있음
       return await go(
         list,
         map(a => new Promise(resolve => {
